@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dogandcatclassifier/screens/home.dart';
 
 void main() {
   // ignore: prefer_const_constructors
@@ -17,7 +18,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      // home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const HomePage(),
     );
   }
 }
