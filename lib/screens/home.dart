@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -11,14 +13,58 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late String imagePath = '';
+  late String imagePath = '', result = '';
   late File? _image;
   late ImagePicker picker = ImagePicker();
-  late XFile? pickedFile;
+  XFile? pickedFile;
+  List<dynamic>? output;
   String? _retrieveDataError;
   dynamic _pickedImageError;
 
+  bool loadingValue = false;
+
+  @override
+  void initState() {
+    super.initState();
+    setState(() {
+      loadingValue = true;
+    });
+    loadModel();
+  }
+
+  @override
+  void dispose() {
+    Tflite.close();
+    super.dispose();
+  }
+
   bool chooseImageFromGallery = true;
+
+  Future loadModel() async {
+    await Tflite.loadModel(
+        model: 'assets/model_unquant.tflite', labels: 'assets/labels.txt');
+  }
+
+  classifyImage(File image) async {
+    output = await Tflite.runModelOnImage(
+        path: image.path,
+        numResults: 2,
+        threshold: 0.5,
+        imageMean: 127.5,
+        imageStd: 127.5);
+
+    setState(() {
+      loadingValue = false;
+    });
+    if (output != null) {
+      print(output![0]['label']);
+      var temp = output![0]['label'].toString();
+      var t2 = temp.split(' ');
+      setState(() {
+        result = t2[1];
+      });
+    }
+  }
 
   set _imageFile(XFile? value) {
     pickedFile = (value == null) ? null : value;
@@ -35,6 +81,7 @@ class _HomePageState extends State<HomePage> {
         _imageFile = pickedFile;
         _image = File(pickedFile!.path);
       });
+      classifyImage(_image!);
     } catch (e) {
       setState(() {
         _pickedImageError = e;
@@ -88,7 +135,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     return Image.asset(
-      'assets/logos/bgImage.jpg',
+      'assets/cat.png',
       fit: BoxFit.fill,
     );
   }
@@ -104,7 +151,7 @@ class _HomePageState extends State<HomePage> {
         color: Colors.transparent,
         child: Ink.image(
           image: FileImage(File(pickedFile!.path)),
-          fit: BoxFit.fill,
+          // fit: BoxFit.fill,
           // child: InkWell(onTap: onClicked),
         ),
       );
@@ -112,8 +159,8 @@ class _HomePageState extends State<HomePage> {
       return onErrorDisplay(context, _pickedImageError);
     } else {
       return Image.asset(
-        'assets/logos/bgImage.jpg',
-        fit: BoxFit.fill,
+        'assets/cat.png',
+        // fit: BoxFit.fill,
       );
     }
   }
@@ -123,113 +170,196 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFF101010),
       body: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 24,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            // ignore: prefer_const_literals_to_create_immutables
-            children: [
-              // ignore: prefer_const_constructors
-              SizedBox(
-                height: 100,
-              ),
-              // ignore: prefer_const_constructors
-              Text(
-                'Teachable Machine CNN',
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              // ignore: prefer_const_literals_to_create_immutables
+              children: [
                 // ignore: prefer_const_constructors
-                style: TextStyle(
-                  color: const Color(0xFFEEDA28),
-                  fontSize: 15,
+                SizedBox(
+                  height: 100,
                 ),
-              ),
-              const SizedBox(
-                height: 6,
-              ),
-              const Text(
-                'Detect Dogs and Cats',
-                style: TextStyle(
-                  color: Color(0xFFE99600),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 28,
+                // ignore: prefer_const_constructors
+                Text(
+                  'Teachable Machine CNN',
+                  // ignore: prefer_const_constructors
+                  style: TextStyle(
+                    color: const Color(0xFFEEDA28),
+                    fontSize: 15,
+                  ),
                 ),
-              ),
-              const SizedBox(
-                height: 50,
-              ),
-              Center(
-                child: SizedBox(
-                  width: 300,
+                const SizedBox(
+                  height: 6,
+                ),
+                const Text(
+                  'Detect Dogs and Cats',
+                  style: TextStyle(
+                    color: Color(0xFFE99600),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 28,
+                  ),
+                ),
+                const SizedBox(
+                  height: 50,
+                ),
+                Center(
                   child: Column(
                     children: [
-                      Image.asset(
-                        'assets/cat.png',
+                      Container(
+                        color: Colors.transparent,
+                        width: MediaQuery.of(context).size.width,
+                        height: MediaQuery.of(context).size.height - 400,
+                        child: FutureBuilder<void>(
+                          future: getLostData(),
+                          builder: (BuildContext context,
+                              AsyncSnapshot<void> snapshot) {
+                            switch (snapshot.connectionState) {
+                              case ConnectionState.none:
+                              case ConnectionState.waiting:
+                                return Image.asset(
+                                  'assets/cat.png',
+                                  fit: BoxFit.fill,
+                                );
+                              case ConnectionState.done:
+                                return displayImage();
+                              default:
+                                if (snapshot.hasError) {
+                                  return onErrorDisplay(
+                                      context, snapshot.error.toString());
+                                } else {
+                                  return Image.asset(
+                                    'assets/cat.png',
+                                    fit: BoxFit.fill,
+                                  );
+                                }
+                            }
+                          },
+                        ),
                       ),
-                      const SizedBox(
-                        height: 50,
+                      (output != null)
+                          ? Divider(
+                              height: 10,
+                              color: Colors.transparent,
+                            )
+                          : SizedBox(),
+                      (output != null)
+                          ? Text(
+                              // '${output![0]['label']}',
+                              result,
+                              style: TextStyle(
+                                color: Colors.white,
+                              ),
+                            )
+                          : SizedBox(),
+                      // (output == null) ? Divider(height: 10, color: Colors.transparent,) : null,
+                    ],
+                  ),
+                ),
+                Divider(
+                  color: Colors.transparent,
+                  height: 10,
+                ),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            chooseImageFromGallery = false;
+                          });
+                          pickImage();
+                        },
+                        child: Container(
+                          width: MediaQuery.of(context).size.width - 20,
+                          alignment: Alignment.center,
+                          // ignore: prefer_const_constructors
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 17,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFE99600,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('Take a picture'),
+                        ),
+                      ),
+                      Divider(
+                        color: Colors.transparent,
+                        height: 10,
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            chooseImageFromGallery = true;
+                          });
+                          pickImage();
+                        },
+                        child: Container(
+                          width: MediaQuery.of(context).size.width - 20,
+                          alignment: Alignment.center,
+                          // ignore: prefer_const_constructors
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 17,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFE99600,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('Choose a picture from gallery'),
+                        ),
+                      ),
+                      Divider(
+                        color: Colors.transparent,
+                        height: 10,
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            imagePath = '';
+                            _image = null;
+                            pickedFile = null;
+                            _retrieveDataError = null;
+                            output = null;
+                          });
+                        },
+                        child: Container(
+                          width: MediaQuery.of(context).size.width - 20,
+                          alignment: Alignment.center,
+                          // ignore: prefer_const_constructors
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 17,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFE99600,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text('Reset to defaults'),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              SizedBox(
-                width: MediaQuery.of(context).size.width,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          chooseImageFromGallery = false;
-                        });
-                        pickImage();
-                      },
-                      child: Container(
-                        width: MediaQuery.of(context).size.width - 260,
-                        alignment: Alignment.center,
-                        // ignore: prefer_const_constructors
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 17,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFFE99600,
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text('Take a picture'),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          chooseImageFromGallery = true;
-                        });
-                        pickImage();
-                      },
-                      child: Container(
-                        width: MediaQuery.of(context).size.width - 260,
-                        alignment: Alignment.center,
-                        // ignore: prefer_const_constructors
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 17,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(
-                            0xFFE99600,
-                          ),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text('Choose a picture from gallery'),
-                      ),
-                    ),
-                  ],
+                Divider(
+                  color: Colors.transparent,
+                  height: 10,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
